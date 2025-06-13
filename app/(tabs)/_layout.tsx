@@ -7,39 +7,48 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useThemeCustom } from '@/contexts/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
+
+
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
+  const { theme } = useThemeCustom();
+  const isDark = theme === 'dark';
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
-        tabBarButton: HapticTab,
-        tabBarBackground: TabBarBackground,
-        tabBarStyle: Platform.select({
-          ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
-          },
-          default: {},
-        }),
-      }}>
+        tabBarActiveTintColor: isDark ? '#fff' : '#555', // 👈 Forzamos gris oscuro en modo claro
+        tabBarInactiveTintColor: isDark ? '#888' : '#999',
+        tabBarStyle: {
+          backgroundColor: isDark ? '#111' : '#f4f4f4',
+          borderTopColor: isDark ? '#333' : '#ccc',
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home" color={color} size={size} />
+          ),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Futuro',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="play" color={color} size={size} />
+          ),
         }}
       />
+      <Tabs.Screen name="create" options={{ href: null }} />
+      <Tabs.Screen name="update" options={{ href: null }} />
+      <Tabs.Screen name="reminders" options={{ href: null }} />
+
     </Tabs>
   );
 }

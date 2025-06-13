@@ -1,75 +1,163 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import React from 'react';
+import { View, ActivityIndicator, Modal, Platform, Text, Alert } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useThemeCustom } from '@/contexts/ThemeContext';
+import { useLogout } from '../../hooks/useLogout';
+import { useUser } from '../../contexts/UserContext';
+import { useFocusEffect } from '@react-navigation/native';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import Header from './Components/Header';
+import CalendarMonth from './Components/CalendarMonth';
+import DayActions from './Components/DayActions';
+import { useCalendarLogic } from './Components/useCalendarLogic';
 
 export default function HomeScreen() {
+  const { theme, toggleTheme } = useThemeCustom();
+  const isDark = theme === 'dark';
+  const { logout } = useLogout();
+  const { user } = useUser();
+  const email = user?.email;
+  const router = useRouter();
+
+  // Hook modularizado
+  const {
+    citas, loadingCitas, events, loadingEvents, selectedDate, setSelectedDate,
+    month, setMonth, modalVisible, setModalVisible, modalDate, setModalDate,
+    borrarCita, markedDates, refreshCitas, refreshEvents
+  } = useCalendarLogic(email);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshCitas();
+      refreshEvents();
+    }, [refreshCitas, refreshEvents])
+  );
+
+  const isWeb = Platform.OS === 'web';
+
+  // 🔥 Nuevo: Calcula los eventos del día en cada render
+  const eventosDelDia = React.useMemo(() => {
+    if (!modalDate) return [];
+    return [
+      ...events.filter(ev =>
+        (ev.start?.dateTime?.slice(0,10) || ev.start?.date) === modalDate
+      ),
+      ...citas.filter(cita =>
+        cita.date.slice(0,10) === modalDate
+      )
+    ];
+  }, [modalDate, events, citas]);
+
+  if (!email) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#1aa5ff" />
+        <Text>Cargando usuario...</Text>
+      </View>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <View style={{ flex: 1, backgroundColor: isDark ? '#181818' : '#f3f3f3' }}>
+      <Header
+        isDark={isDark}
+        toggleTheme={toggleTheme}
+        user={user}
+        logout={logout}
+      />
+      <View style={{ flex: 1, flexDirection: isWeb ? 'row' : 'column' }}>
+        <View style={{ flex: 2, padding: 16 }}>
+          <CalendarMonth
+            isDark={isDark}
+            markedDates={markedDates}
+            onDayPress={day => {
+              setSelectedDate(day.dateString);
+              setModalDate(day.dateString);
+              setModalVisible(true);
+            }}
+            onMonthChange={m => {
+              setMonth({ year: m.year, month: m.month });
+              setSelectedDate('');
+            }}
+          />
+        </View>
+        {isWeb ? (
+          <View style={{
+            flex: 1, backgroundColor: isDark ? '#23262d' : '#fff',
+            borderLeftWidth: 1, borderLeftColor: '#e0e0e0',
+            minWidth: 300, maxWidth: 420, padding: 20,
+            alignItems: 'center', boxShadow: '0 0 12px #0002'
+          }}>
+            {modalVisible && (
+              <DayActions
+                isDark={isDark}
+                modalDate={modalDate}
+                modalEvents={eventosDelDia} 
+                onEdit={item => {
+                  setModalVisible(false);
+                  if ('appointmentId' in item) {
+                    router.push({ pathname: '/update', params: { id: item.appointmentId } });
+                  } else {
+                    router.push({ pathname: '/update', params: { id: item.id } });
+                  }
+                }}
+                onDelete={async item => {
+                  await borrarCita(item);
+                  await refreshCitas();
+                  await refreshEvents();
+                  Alert.alert('Cita eliminada');
+                }}
+                onAdd={(hour: number) => {
+                  setModalVisible(false);
+                  const iso = `${modalDate}T${String(hour).padStart(2,'0')}:00:00`;
+                  router.push({ pathname: '/create', params: { date: iso } });
+                }}
+                onClose={() => setModalVisible(false)}
+              />
+            )}
+            {!modalVisible && (
+              <View style={{ marginTop: 24 }}>
+                <ActivityIndicator size="small" color="#1aa5ff" animating={loadingCitas || loadingEvents} />
+              </View>
+            )}
+          </View>
+        ) : (
+          <Modal
+            visible={modalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setModalVisible(false)}
+          >
+            <View style={{ flex: 1, backgroundColor: '#000a', justifyContent: 'center', alignItems: 'center' }}>
+              <DayActions
+                isDark={isDark}
+                modalDate={modalDate}
+                modalEvents={eventosDelDia} 
+                onEdit={item => {
+                  setModalVisible(false);
+                  if ('appointmentId' in item) {
+                    router.push({ pathname: '/update', params: { id: item.appointmentId } });
+                  } else {
+                    router.push({ pathname: '/update', params: { id: item.id } });
+                  }
+                }}
+                onDelete={async item => {
+                  await borrarCita(item);
+                  await refreshCitas();
+                  await refreshEvents();
+                  Alert.alert('Cita eliminada');
+                }}
+                onAdd={(hour: number) => {
+                  setModalVisible(false);
+                  const iso = `${modalDate}T${String(hour).padStart(2,'0')}:00:00`;
+                  router.push({ pathname: '/create', params: { date: iso } });
+                }}
+                onClose={() => setModalVisible(false)}
+              />
+            </View>
+          </Modal>
+        )}
+      </View>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});

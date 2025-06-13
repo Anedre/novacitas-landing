@@ -2,10 +2,12 @@
   "expo": {
     "name": "nova-calendario",
     "slug": "nova-calendario",
+    "owner": "huzhan",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "novacalendario",
+
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -16,6 +18,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "package": "com.novacitas.app",
       "edgeToEdgeEnabled": true
     },
     "web": {
@@ -33,10 +36,17 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "10b0c587-7aca-4db3-a3a6-e7810d10b880"
+      }
     }
   }
 }
